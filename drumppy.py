@@ -34,6 +34,7 @@ from time import gmtime, strftime, localtime, sleep
 import queue
 from drumppy_gui import start_gui, GUI
 from drumppy_functions import DrumppyFunctions
+import json
 
 def main_loop(dp, flags_2_main, queue_2_main, queue_2_gui):
     """Main loop for handling device communication and GUI updates"""
@@ -52,7 +53,6 @@ def main_loop(dp, flags_2_main, queue_2_main, queue_2_gui):
                 flags_2_main["flag_play_patt"].clear()
                 flags_2_main["flag_stop_play_patt"].clear()
             if flags_2_main["flag_4"].is_set():
-                print("---------------------")
                 flags_2_main["flag_4"].clear()
             try:
                 message = queue_2_main.get_nowait()
@@ -62,6 +62,18 @@ def main_loop(dp, flags_2_main, queue_2_main, queue_2_gui):
                     dp.chosen_midi_port = message[1]
                     dp.chosen_channel = str(message[2])
                     flags_2_main["flag_midi_port"].set()
+                if message[0] == "Patterns:":
+                    dp.drum_patterns_module_name = message[1]
+                    dp.drum_patterns_names = json.loads(message[2])
+                    print("+++++++++++++++++++++++++++++++++++++++")
+                    print(dp.drum_patterns_names)
+                    dp.load_drum_patterns()
+
+                if message[0] == "Instruments_names:":
+                    dp.instruments_names = json.loads(message[1])
+                #if message[0] == "Chosen_genre:":
+                #    dp.chosen_genre = message[1]
+                #    self.get_drum_patterns(self.music_genres[0])
                 if message[0] == "Chosen_pattern:":
                     dp.chosen_instrument = message[1]
                     dp.chosen_pattern = message[2]
