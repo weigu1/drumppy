@@ -7,6 +7,7 @@ from functools import partial # to pass argument from profile buttons
 import json
 from drumppy_instruments import instruments
 import importlib
+import copy
 
 class GUI:
     def __init__(self, flags_2_main, queue_2_main, queue_2_gui):
@@ -28,6 +29,7 @@ class GUI:
         self.instruments_ports = []
         self.channels_nrs = [str(i) for i in range(1, 17)]  # MIDI channels 1-16
         self.drum_patterns = []
+        self.current_drum_pattern = []
         self.drum_patterns_names = []
         self.drum_patterns_module_filename = ""
         self.chosen_instrument_drum_names = []
@@ -59,6 +61,7 @@ class GUI:
                                   "Genre" : "Music genre",
                                   "Save" : "Save",
                                   "Save_as" : "Save as",
+                                  "New_pattern" : "New pattern name",
                                   "Pattern_editor": "Pattern editor",
                                   "Velocity" : "MIDI velocity: ",
                                   "Free" : "Free",
@@ -206,39 +209,62 @@ class GUI:
         try:
             for i in range(len(self.drum_patterns)):
                 if self.chosen_pattern_name == self.drum_patterns[i][0]["pattern_name"]:
-                    self.chosen_pattern_index = i
+                    self.current_drum_pattern = self.drum_patterns[i]
         except:
             text = "error: pattern not found"
             print(text)
             self.textwindow_insert(text + "\n")
             return
         # get pattern midi channel and send it to main
-        self.chosen_channel = self.drum_patterns[self.chosen_pattern_index][0]["midi_channel"]
+        self.chosen_channel = self.current_drum_pattern[0]["midi_channel"]
         self.channel.set(self.chosen_channel)
         text = f"Chosen_pattern:\n{self.chosen_instrument_name}\n{self.chosen_pattern_name}\n{self.bpm.get()}\n{self.chosen_channel}"
         self.queue_2_main.put(text)  # Add the text to queue_2_main flag is set in main
-        nr_of_drums = self.drum_patterns[self.chosen_pattern_index][0]["nr_of_drums"]
+        nr_of_drums = self.current_drum_pattern[0]["nr_of_drums"]
         for i in range(nr_of_drums):
-            self.combo_drum_txt[i].set(self.drum_patterns[self.chosen_pattern_index][i+1]["drum_name"])
-            if self.drum_patterns[self.chosen_pattern_index][i+1]["muted"] == "y":
+            self.combo_drum_txt[i].set(self.current_drum_pattern[i+1]["drum_name"])
+            if self.current_drum_pattern[i+1]["muted"] == "y":
                 self.butt_mute[i].configure(style="muted_butt.TButton")
                 self.butt_mute_txt[i].set("Muted")
             for j in range(16):
-
-                str_vel = str(self.drum_patterns[self.chosen_pattern_index][i+1][j+1][1])
-                if self.drum_patterns[self.chosen_pattern_index][i+1][j+1][0] == 1: # both beginning with 1
+                str_vel = str(self.current_drum_pattern[i+1][j+1][1])
+                if self.current_drum_pattern[i+1][j+1][0] == 1: # both beginning with 1
                     self.butt_patt[j+i*16].configure(style="patt_butt_on.TButton")
                     self.butt_patt_txt[j+i*16].set(str_vel)
                 else:
                     self.butt_patt[j+i*16].configure(style="patt_butt_off.TButton")
                     self.butt_patt_txt[j+i*16].set(str_vel)
         # check lock
-        self.lock = self.drum_patterns[self.chosen_pattern_index][0]["locked"]
+        self.lock = self.current_drum_pattern[0]["locked"]
         if self.lock == "n":
             self.butt_lock.configure(text = self.widget_texts_dict["Free"], style="pressed.TButton")
         else:
             self.butt_lock.configure(text = self.widget_texts_dict["Locked"], style="important.TButton")
         self.textwindow_insert(f"Pattern chosen: {self.chosen_pattern_name}\n")
+
+    def create_text_drum_patterns_list(self):
+        text = "drum_patterns = " + json.dumps(self.drum_patterns)
+        mtext = text.replace(", ",",")
+        mtext = mtext.replace(": ",":")
+        mtext = mtext.replace("},","},\n                  ")
+        mtext = mtext.replace("}],","}\n                 ],\n                 ")
+        mtext = mtext.replace('"1"','1')
+        mtext = mtext.replace('"2"','2')
+        mtext = mtext.replace('"3"','3')
+        mtext = mtext.replace('"4"','4')
+        mtext = mtext.replace('"5"','5')
+        mtext = mtext.replace('"6"','6')
+        mtext = mtext.replace('"7"','7')
+        mtext = mtext.replace('"8"','8')
+        mtext = mtext.replace('"9"','9')
+        mtext = mtext.replace('"10"','10')
+        mtext = mtext.replace('"11"','11')
+        mtext = mtext.replace('"12"','12')
+        mtext = mtext.replace('"13"','13')
+        mtext = mtext.replace('"14"','14')
+        mtext = mtext.replace('"15"','15')
+        mtext = mtext.replace('"16"','16')
+        return mtext
 
     ###### Functions for Connect frame: Connect to MIDI port #####
     def on_butt_connect(self):
@@ -299,85 +325,69 @@ class GUI:
 
     ###### Functions for Connect frame: Save and Save as ######
     def on_butt_save(self):
+        """ Save the pattern """
         if self.lock == "y":
              text = 'This pattern is locked !! Choose "Save as" with a new name or unlock.\n'
              self.textwindow_insert(text)
              return
         else:
-            text = "drum_patterns = " + json.dumps(self.drum_patterns)
-            mtext = text.replace(", ",",")
-            mtext = mtext.replace(": ",":")
-            mtext = mtext.replace("},","},\n                  ")
-            mtext = mtext.replace("}],","}\n                 ],\n                 ")
-            mtext = mtext.replace('"1"','1')
-            mtext = mtext.replace('"2"','2')
-            mtext = mtext.replace('"3"','3')
-            mtext = mtext.replace('"4"','4')
-            mtext = mtext.replace('"5"','5')
-            mtext = mtext.replace('"6"','6')
-            mtext = mtext.replace('"7"','7')
-            mtext = mtext.replace('"8"','8')
-            mtext = mtext.replace('"9"','9')
-            mtext = mtext.replace('"10"','10')
-            mtext = mtext.replace('"11"','11')
-            mtext = mtext.replace('"12"','12')
-            mtext = mtext.replace('"13"','13')
-            mtext = mtext.replace('"14"','14')
-            mtext = mtext.replace('"15"','15')
-            mtext = mtext.replace('"16"','16')
-            with open(self.drum_patterns_module_filename, "w") as f:
-            #with open("t.py", "w") as f:
-                f.write(mtext)
-            text = 'Pattern is saved!\n'
+            mtext = self.create_text_drum_patterns_list()
+
+    def on_butt_save_as(self):
+        """ Save the pattern as a new pattern """
+        drum_pattern_new = copy.deepcopy(self.current_drum_pattern) # we need deepcopy to avoid shared references!
+        drum_pattern_new[0]["pattern_name"] = self.new_pattern_name.get()
+        self.drum_patterns.append(drum_pattern_new)
+        mtext = self.create_text_drum_patterns_list()
+        print(mtext)
+        with open(self.drum_patterns_module_filename, "w") as f:
+            f.write(mtext)
+            text = 'New Pattern is saved!\n'
             self.textwindow_insert(text)
 
 
-
-
-    def on_butt_save_as(self):
-        pass
 
     ###### Functions pattern editor frame (drum, pad, mute, velocity) ######
     # I didn't find a fast way to pass a variable with the bindings
     def combo_drum_1_bind(self, event):
         """ Binding to combobox drum nr 1 """
         drum_name = self.combo_drum_txt[0].get()
-        self.drum_patterns[self.chosen_pattern_index][1]["drum_name"] = drum_name
+        self.current_drum_pattern[1]["drum_name"] = drum_name
 
     def combo_drum_2_bind(self, event):
         """ Binding to combobox drum nr 2 """
         drum_name = self.combo_drum_txt[1].get()
-        self.drum_patterns[self.chosen_pattern_index][2]["drum_name"] = drum_name
+        self.current_drum_pattern[2]["drum_name"] = drum_name
 
     def combo_drum_3_bind(self, event):
         """ Binding to combobox drum nr 3 """
         drum_name = self.combo_drum_txt[2].get()
-        self.drum_patterns[self.chosen_pattern_index][3]["drum_name"] = drum_name
+        self.current_drum_pattern[3]["drum_name"] = drum_name
 
     def combo_drum_4_bind(self, event):
         """ Binding to combobox drum nr 4 """
         drum_name = self.combo_drum_txt[3].get()
-        self.drum_patterns[self.chosen_pattern_index][4]["drum_name"] = drum_name
+        self.current_drum_pattern[4]["drum_name"] = drum_name
 
     def combo_drum_5_bind(self, event):
         """ Binding to combobox drum nr 5 """
         drum_name = self.combo_drum_txt[4].get()
-        self.drum_patterns[self.chosen_pattern_index][5]["drum_name"] = drum_name
+        self.current_drum_pattern[5]["drum_name"] = drum_name
 
     def combo_drum_6_bind(self, event):
         """ Binding to combobox drum nr 6 """
         drum_name = self.combo_drum_txt[5].get()
-        self.drum_patterns[self.chosen_pattern_index][6]["drum_name"] = drum_name
+        self.current_drum_pattern[6]["drum_name"] = drum_name
 
     def combo_drum_7_bind(self, event):
         """ Binding to combobox drum nr 7 """
         drum_name = self.combo_drum_txt[6].get()
-        self.drum_patterns[self.chosen_pattern_index][7]["drum_name"] = drum_name
+        self.current_drum_pattern[7]["drum_name"] = drum_name
 
     def combo_drum_8_bind(self, event):
         """ Binding to combobox drum nr 8 """
         drum_name = self.combo_drum_txt[7].get()
-        self.drum_patterns[self.chosen_pattern_index][8]["drum_name"] = drum_name
+        self.current_drum_pattern[8]["drum_name"] = drum_name
 
     def on_butt_pad(self,nr):
         """ One of 128 pads is pressed"""
@@ -390,22 +400,22 @@ class GUI:
         vel_s = self.velocity.get() # string
         vel = int(self.velocity.get())
         if butt_patt_vel == 0:
-             self.drum_patterns[self.chosen_pattern_index][drum_nr][tick_nr] = [1,64]
+             self.current_drum_pattern[drum_nr][tick_nr] = [1,64]
              self.butt_patt[nr].configure(style="patt_butt_on.TButton")
              self.butt_patt_txt[nr].set(vel_s)
         else:
-             self.drum_patterns[self.chosen_pattern_index][drum_nr][tick_nr] = [0,0]
+             self.current_drum_pattern[drum_nr][tick_nr] = [0,0]
              self.butt_patt[nr].configure(style="patt_butt_off.TButton")
              self.butt_patt_txt[nr].set(0)
 
     def on_butt_mute(self,nr):
         drum_nr = nr+1
         if self.butt_mute_txt[nr].get() == "Mute":
-            self.drum_patterns[self.chosen_pattern_index][drum_nr]["muted"] = "y"
+            self.current_drum_pattern[drum_nr]["muted"] = "y"
             self.butt_mute[nr].configure(style="muted_butt.TButton")
             self.butt_mute_txt[nr].set("Muted")
         else:
-            self.drum_patterns[self.chosen_pattern_index][drum_nr]["muted"] = "n"
+            self.current_drum_pattern[drum_nr]["muted"] = "n"
             self.butt_mute[nr].configure(style="mute_butt.TButton")
             self.butt_mute_txt[nr].set("Mute")
 
@@ -445,7 +455,7 @@ class GUI:
         else:
             self.lock = "n"
             self.butt_lock.configure(text = self.widget_texts_dict["Free"], style="pressed.TButton")
-        self.drum_patterns[self.chosen_pattern_index][0]["locked"] = self.lock
+        self.current_drum_pattern[0]["locked"] = self.lock
         self.textwindow_insert(f"Lock changed to: {self.lock}\n")
 
     ###### Functions play frame (BPM, play, stop) ######
@@ -639,6 +649,8 @@ class GUI:
         self.pattern.set(self.drum_patterns_names[0])
         self.channel = StringVar()
         self.channel.set(self.channels_nrs[0])
+        self.new_pattern_name = StringVar()
+        self.new_pattern_name.set(f"basic_{self.music_genre.get()}_1")
         self.butt_patt_txt = []
         for i in range(128):
             var = StringVar()
@@ -845,12 +857,21 @@ class GUI:
                                     style="default.TButton")
         self.butt_save.grid(ipady=self.ipady, column=1,row=1,sticky=(W))
         self.butt_save_as = ttk.Button(self.frame_Save,
-                                    text=self.widget_texts_dict["Save_as"],
-                                    command=self.on_butt_save_as,
-                                    width=self.button_width,
-                                    style="default.TButton")
-        self.butt_save_as.grid(ipady=self.ipady, column=1,row=2,sticky=(W))
-
+                                        text=self.widget_texts_dict["Save_as"],
+                                        command=self.on_butt_save_as,
+                                        width=self.button_width,
+                                        style="default.TButton")
+        self.butt_save_as.grid(pady = (10,0), ipady=self.ipady, column=1,row=2,sticky=(W))
+        self.label_entry_np = ttk.Label(self.frame_Save,
+                                        text=self.widget_texts_dict["New_pattern"],
+                                        foreground="red",
+                                        style="default.TLabel")
+        self.label_entry_np.grid(pady = (20,0), column=1, row=3, sticky=(N,W,E))
+        self.entry_save_new = ttk.Entry(self.frame_Save,
+                                        textvariable=self.new_pattern_name,
+                                        width=self.button_width+7,
+                                        style="default.TEntry")
+        self.entry_save_new.grid(ipady=self.ipady, column=1,row=4,sticky=(W))
 
         # frame Pattern_editor  ++++++++++++++++++++++++++++++++++++++++++++++++++++
         self.frame_Patt_editor = ttk.Frame(self.frame_Main,
