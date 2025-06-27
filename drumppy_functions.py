@@ -1,12 +1,14 @@
 """  drumppy functions """
 
+from email.mime import message
 import os
 import time
 from time import sleep
 from datetime import datetime
 import mido
 from drumppy_instruments import instruments
-from drumppy_songs import songs
+from drumppy_music_genres import music_genres
+from drumppy_patterns.drumppy_patterns_template import text as template
 import json
 import importlib
 
@@ -29,7 +31,28 @@ class DrumppyFunctions:
         self.chosen_pattern = ""
         self.chosen_channel = 9
         self.chosen_bpm = 120
+        self.chosen_song = []
+        self.ticks_2_play = 16
         self.flag_play = True
+
+    def create_music_genres_files(self):
+        """Create a pattern file for music genre if not existent."""
+        try:
+            for genre in music_genres:
+                filename = f"drumppy_patterns/drumppy_patterns_{genre}.py"
+                if not os.path.exists(filename):
+                    with open(filename, 'w') as f:
+                        f.write(f"# Drum patterns for {genre}\n")
+                        f.write('drum_patterns = [[{"pattern_name":"' + genre + '_beat_1",')
+                        f.write(template)
+            os.chdir(self.script_dir)
+            text = "Music genres files created successfully."
+            print(text)
+            self.queue_2_gui.put(text)
+        except Exception as e:
+            text = f"Error creating music genres files: {e}!"
+            print(text)
+            self.queue_2_gui.put(text)
 
     def get_midi_ports(self):
         """Function to retrieve available MIDI output ports."""
@@ -49,6 +72,7 @@ class DrumppyFunctions:
     def load_drum_patterns(self):
         """ Load drum_patterns and their names """
         try:
+            #print(self.drum_patterns_module_name)
             drum_patterns_module = importlib.import_module(self.drum_patterns_module_name)
             self.drum_patterns = drum_patterns_module.drum_patterns
             self.chosen_pattern = self.drum_patterns_names[0]
@@ -56,6 +80,100 @@ class DrumppyFunctions:
             text = f"Error retrieving drum patterns: {e}!"
             print(text)
             self.queue_2_gui.put(text)
+
+
+    def check_port(self, midi_port = "CH345:CH345 MIDI 1"):  # "USB MIDI 2x2:USB MIDI 2x2 MIDI 1"
+        """Function to check if a specific MIDI port is available."""
+        try:
+            for port in mido.get_output_names():
+                if midi_port in port:
+                    return port
+            return "None"
+        except Exception as e:
+            text = f"Error retrieving MIDI output port: {e}"
+            print(text)
+            self.queue_2_gui.put(text)
+
+    def play_drum_pattern(self):
+        """Function to send drum pattern to the MIDI output port."""
+        if self.chosen_midi_port == "":
+            text = ("No valid midi port! Connect first!")
+            print(text)
+            self.queue_2_gui.put(text)
+            self.flags_2_main["flag_stop_play_patt"].set()
+            return
+        try:
+            p_index = self.drum_patterns_names.index(self.chosen_pattern)
+            i_index = self.instruments_names.index(self.chosen_instrument)
+            drum_pattern = self.drum_patterns[int(p_index)]
+            instrument = self.instruments[int(i_index)]
+            #ch = instrument["midi_channel"]
+            ch = int(self.chosen_channel)-1 # mido starts with 0
+            ra = drum_pattern[0]["nr_of_drums"]+1
+            sixteenth_time = 60 / int(self.chosen_bpm) / 4    # 4 beats per bar, so divide by 4
+            with mido.open_output(self.chosen_midi_port) as outport:
+                for j in range(1, int(self.ticks_2_play) + 1):
+                    #text = f"Tick:\n{j}"  # sorry queue is too slow
+                    #self.queue_2_gui.put(text)
+                    for i in range(1,ra):
+                        if drum_pattern[i]["drum_name"] == "":
+                            break
+                        if drum_pattern[i]["muted"] == "n":
+                            if drum_pattern[i][j][0] == 1:
+                                msg = mido.Message('note_on', note=instrument[drum_pattern[i]["drum_name"]], velocity=drum_pattern[i][j][1], channel=ch)
+                                outport.send(msg)
+                            else:
+                                msg = mido.Message('note_off', note=instrument[drum_pattern[i]["drum_name"]], velocity=drum_pattern[i][j][1], channel=ch)
+                                outport.send(msg)
+                    sleep(sixteenth_time)
+            #text = f"Tick_15:\n"
+            #self.queue_2_gui.put(text)
+
+        except Exception as e:
+            text = f"Error playing drum pattern: {e}"
+            print(text)
+            self.queue_2_gui.put(text)
+
+    def play_song(self):
+        """Function to play a song of patterns."""
+        if self.chosen_song == []:
+            text = ("No valid song! Choose song first!")
+            print(text)
+            self.queue_2_gui.put(text)
+            self.flags_2_main["flag_stop_play_song"].set()
+            return
+        print(self.chosen_song)
+        text = f"Playing song: {self.chosen_song[0]['song_name']}"
+        nr_of_segments = len(self.chosen_song)
+        print(nr_of_segments)
+        if nr_of_segments < 2:
+            text = "No patterns in song!"
+            print(text)
+            self.queue_2_gui.put(text)
+            return
+        for i in range(1, nr_of_segments):
+            patt_cnt = 0
+            for pattern in self.chosen_song[i]:
+                patt_cnt = patt_cnt + 1
+                self.chosen_pattern = pattern[0]
+                text = f"Next_pattern:\n{i}\n{patt_cnt}\n{self.chosen_pattern}"
+                self.queue_2_gui.put(text)
+                repeat = pattern[1]
+                while(repeat):
+                    if self.flags_2_main["flag_stop_play_song"].is_set():
+                        self.flags_2_main["flag_stop_play_patt"].clear()
+                        return
+                    text = f"Playing pattern: {pattern[0]}"
+                    print(text)
+                    self.queue_2_gui.put(text)
+                    self.play_drum_pattern()
+                    repeat = repeat-1
+        text = f"Song_end:"
+        self.queue_2_gui.put(text)
+
+
+
+
 
     def send_identity_request(self, chosen_midi_port, timeout=2):
         """
@@ -128,69 +246,6 @@ class DrumppyFunctions:
             text = f"Error playing notes: {e}"
             print(text)
             self.queue_2_gui.put(text)
-
-    def check_port(self, midi_port = "CH345:CH345 MIDI 1"):  # "USB MIDI 2x2:USB MIDI 2x2 MIDI 1"
-        """Function to check if a specific MIDI port is available."""
-        try:
-            for port in mido.get_output_names():
-                if midi_port in port:
-                    return port
-            return "None"
-        except Exception as e:
-            text = f"Error retrieving MIDI output port: {e}"
-            print(text)
-            self.queue_2_gui.put(text)
-
-    def play_drum_pattern(self):
-        """Function to send drum pattern to the MIDI output port."""
-        if self.chosen_midi_port == "":
-            text = ("No valid midi port! Connect first!")
-            print(text)
-            self.queue_2_gui.put(text)
-            self.flags_2_main["flag_stop_play_patt"].set()
-            return
-        try:
-            print(self.drum_patterns_names)
-            p_index = self.drum_patterns_names.index(self.chosen_pattern)
-            i_index = self.instruments_names.index(self.chosen_instrument)
-            drum_pattern = self.drum_patterns[int(p_index)]
-            instrument = self.instruments[int(i_index)]
-            #ch = instrument["midi_channel"]
-            ch = int(self.chosen_channel)-1 # mido starts with 0
-            ra = drum_pattern[0]["nr_of_drums"]+1
-            sixteenth_time = 60 / int(self.chosen_bpm) / 4    # 4 beats per bar, so divide by 4
-            with mido.open_output(self.chosen_midi_port) as outport:
-                for j in range(1,17):
-                    for i in range(1,ra):
-                        if drum_pattern[i]["drum_name"] == "":
-                            break
-                        if drum_pattern[i]["muted"] == "n":
-                            if drum_pattern[i][j][0] == 1:
-                                msg = mido.Message('note_on', note=instrument[drum_pattern[i]["drum_name"]], velocity=drum_pattern[i][j][1], channel=ch)
-                                outport.send(msg)
-                            else:
-                                msg = mido.Message('note_off', note=instrument[drum_pattern[i]["drum_name"]], velocity=drum_pattern[i][j][1], channel=ch)
-                                outport.send(msg)
-                    sleep(sixteenth_time)
-        except Exception as e:
-            text = f"Error playing drum pattern: {e}"
-            print(text)
-            self.queue_2_gui.put(text)
-
-
-
-
-"""
-    def play_song(self, song = songs[1]):
-        """"""Function to play a song of patterns.""""""
-        print(f"Playing song: {song['song_name']}")
-        print(len(song["patterns"]))
-        for pattern in song["patterns"]:
-            print(f"Playing pattern: {pattern}")
-            for item in drum_patterns:
-                if drum_patterns[item][0]["pattern_name"] == pattern:
-                    self.play_drum_pattern(drum_patterns_pop_rock[item])
-"""
 
 if __name__ == "__main__":
 

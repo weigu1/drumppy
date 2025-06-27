@@ -1,0 +1,1 @@
+[{"song_name": "my_first_song", "music_genre": "pop_rock", "bpm": 120}, [["basic_pop_beat_3",1], ["basic_pop_beat_3b",2], ["basic_pop_beat_3",1],["basic_pop_beat_3c",1]], [["basic_pop_beat_3",1]]]

@@ -1,6 +1,6 @@
 # DRUMPPY: A simple drum pattern editor and player with Python
 
-![DRUMPPY](png/drumppy_800.png "DRUMPPY")
+![DRUMPPY](png/Screenshot_drumppy_800.png "DRUMPPY")
 
 ## Some infos
 

@@ -38,6 +38,7 @@ import json
 
 def main_loop(dp, flags_2_main, queue_2_main, queue_2_gui):
     """Main loop for handling device communication and GUI updates"""
+    dp.create_music_genres_files()  # Create music genres files if they don't exist
     try:
         while not flags_2_main["flag_exit"].is_set():  # Check the exit flag
             if flags_2_main["flag_midi_port"].is_set():
@@ -52,39 +53,48 @@ def main_loop(dp, flags_2_main, queue_2_main, queue_2_gui):
             if flags_2_main["flag_stop_play_patt"].is_set():
                 flags_2_main["flag_play_patt"].clear()
                 flags_2_main["flag_stop_play_patt"].clear()
-            if flags_2_main["flag_4"].is_set():
-                flags_2_main["flag_4"].clear()
+            if flags_2_main["flag_play_song"].is_set():
+                dp.play_song()
+                flags_2_main["flag_play_song"].clear()
+            if flags_2_main["flag_stop_play_song"].is_set():
+                flags_2_main["flag_play_patt"].clear()
+
+                flags_2_main["flag_stop_play_song"].clear()
             try:
                 message = queue_2_main.get_nowait()
                 message = message.split('\n')
                 print(f"Message from GUI: {message}")
                 if message[0] == "Midi_port:":
                     dp.chosen_midi_port = message[1]
-                    dp.chosen_channel = str(message[2])
+                    dp.chosen_channel = message[2]
                     flags_2_main["flag_midi_port"].set()
                 if message[0] == "Patterns:":
                     dp.drum_patterns_module_name = message[1]
                     dp.drum_patterns_names = json.loads(message[2])
-                    print("+++++++++++++++++++++++++++++++++++++++")
-                    print(dp.drum_patterns_names)
                     dp.load_drum_patterns()
-
                 if message[0] == "Instruments_names:":
                     dp.instruments_names = json.loads(message[1])
-                #if message[0] == "Chosen_genre:":
-                #    dp.chosen_genre = message[1]
-                #    self.get_drum_patterns(self.music_genres[0])
+                if message[0] == "Chosen_genre:":
+                    dp.chosen_genre = message[1]
+                    dp.get_drum_patterns(dp.music_genres[0])
+                    dp.load_drum_patterns()
                 if message[0] == "Chosen_pattern:":
                     dp.chosen_instrument = message[1]
                     dp.chosen_pattern = message[2]
-                    bpm = str(message[3])
-                    dp.chosen_channel = str(message[4])
+                    dp.chosen_bpm = message[3]
+                    dp.chosen_channel = message[4]
+                    dp.ticks_2_play = message[5]
                 if message[0] == "BPM change:":
-                    dp.chosen_bpm = str(message[1])
+                    dp.chosen_bpm = message[1]
                 if message[0] == "Instrument change:":
-                    dp.chosen_instrument = str(message[1])
+                    dp.chosen_instrument = message[1]
                 if message[0] == "Channel change:":
-                    dp.chosen_channel = str(message[1])
+                    dp.chosen_channel = message[1]
+                if message[0] == "Song_loaded:":
+                    dp.chosen_song = json.loads(message[1])
+                if message[0] == "Ticks_2_play_change:":
+                   dp.ticks_2_play = message[1]
+
 
             except queue.Empty:
                 pass
@@ -100,8 +110,8 @@ def main():
                     "flag_rescan" : 1,
                     "flag_play_patt" : 2,
                     "flag_stop_play_patt" : 3,
-                    "flag_4" : 4,
-                    "flag_reset_png" : 5,
+                    "flag_play_song" : 4,
+                    "flag_stop_play_song" : 5,
                     "flag_exit" : 6}
     for f in flags_2_main:
         flags_2_main[f] = threading.Event()
