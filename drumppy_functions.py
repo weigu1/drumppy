@@ -34,6 +34,7 @@ class DrumppyFunctions:
         self.chosen_song = []
         self.ticks_2_play = 16
         self.flag_play = True
+        self.roll_seq = [1,9],[1,6,11],[1,5,9,13],[1,4,7,10,13],[1,4,7,10,13,16],[1,3,6,8,11,13,16],[1,3,5,7,9,11,13,15]
 
     def create_music_genres_files(self):
         """Create a pattern file for music genre if not existent."""
@@ -109,23 +110,52 @@ class DrumppyFunctions:
             instrument = self.instruments[int(i_index)]
             #ch = instrument["midi_channel"]
             ch = int(self.chosen_channel)-1 # mido starts with 0
-            ra = drum_pattern[0]["nr_of_drums"]+1
-            sixteenth_time = 60 / int(self.chosen_bpm) / 4    # 4 beats per bar, so divide by 4
+            nr_dr = drum_pattern[0]["nr_of_drums"]
+            #sixteenth_time = 60 / int(self.chosen_bpm) / 4 # 16th per quarter
+            time_1_256 = 60 / int(self.chosen_bpm) / 64    # 64 256th per quarter
+            # get roll and delay of pattern in an array
+            roll = [[0]*16 for _ in range(8)]
+            delay = [[0]*16 for _ in range(8)]
+            #stretch = [[0]*16 for _ in range(8)]
+            for j in range(1, int(self.ticks_2_play) + 1): # ticks to play
+                for i in range(1,nr_dr + 1):
+                    if drum_pattern[i][j][0] & 0b0000_1110 != 0:
+                        roll[i-1][j-1] = (drum_pattern[i][j][0] & 0b0001_1110) >> 1
+                    if len(drum_pattern[i][j]) > 2: # we get different stretch and/or a delay
+                        delay[i-1][j-1] = drum_pattern[i][j][2]
+                    #if len(drum_pattern[i][j]) > 3:
+                    #    stretch[i-1][j-1] = drum_pattern[i][j][3]
+            #print("stretch: ", stretch)
+            #print("roll: ", roll)
+            #print("delay ", delay)
+            # play loop
             with mido.open_output(self.chosen_midi_port) as outport:
-                for j in range(1, int(self.ticks_2_play) + 1):
+                for j in range(1, int(self.ticks_2_play) + 1): # ticks to play
                     #text = f"Tick:\n{j}"  # sorry queue is too slow
                     #self.queue_2_gui.put(text)
-                    for i in range(1,ra):
-                        if drum_pattern[i]["drum_name"] == "":
-                            break
-                        if drum_pattern[i]["muted"] == "n":
-                            if drum_pattern[i][j][0] == 1:
-                                msg = mido.Message('note_on', note=instrument[drum_pattern[i]["drum_name"]], velocity=drum_pattern[i][j][1], channel=ch)
-                                outport.send(msg)
-                            else:
-                                msg = mido.Message('note_off', note=instrument[drum_pattern[i]["drum_name"]], velocity=drum_pattern[i][j][1], channel=ch)
-                                outport.send(msg)
-                    sleep(sixteenth_time)
+                    for k in range(1,17):
+                        for i in range(1,nr_dr + 1):
+                            if drum_pattern[i]["drum_name"] == "":
+                                break
+                            if drum_pattern[i]["muted"] == "n":
+                                if roll[i-1][j-1] == 0  and k == (1 + delay[i-1][j-1]):
+                                    if drum_pattern[i][j][0]:
+                                        msg = mido.Message('note_on', note=instrument[drum_pattern[i]["drum_name"]], velocity=drum_pattern[i][j][1], channel=ch)
+                                        outport.send(msg)
+                                    else:
+                                        msg = mido.Message('note_off', note=instrument[drum_pattern[i]["drum_name"]], velocity=drum_pattern[i][j][1], channel=ch)
+                                        outport.send(msg)
+                                if roll[i-1][j-1] > 1:
+                                    rk = self.roll_seq[roll[i-1][j-1]-2]
+                                    for l in range(0,len(rk)):
+                                        rk[l] = rk[l] + delay[i-1][j-1]
+                                        if rk[l] > 16:
+                                            rk[l] = 0
+                                    for item in rk:
+                                        if k == item:
+                                            msg = mido.Message('note_on', note=instrument[drum_pattern[i]["drum_name"]], velocity=drum_pattern[i][j][1], channel=ch)
+                                            outport.send(msg)
+                        sleep(time_1_256)
             #text = f"Tick_15:\n"
             #self.queue_2_gui.put(text)
 
