@@ -17,7 +17,7 @@ instruments = [{"instrument_name" : "cyclone_tt_78",
                 "claves" : 75
                },
                {"instrument_name" : "nano_synth",
-                "midi_port" : "Pico:Pico CircuitPython usb_midi",
+                "midi_port" : "Pico:Pico CircuitPython usb_midi.por",
                 "midi_channel" :10,
                 "acoustic_bass_drum":35,
                 "bass_drum_1" : 36,

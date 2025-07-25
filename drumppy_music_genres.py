@@ -1,1 +1,1 @@
-music_genres = ["pop_rock","reggae","rock","pop"]
+music_genres = ["reggae","pop_rock", "rock","pop"]

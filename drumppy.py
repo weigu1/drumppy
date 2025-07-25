@@ -48,6 +48,9 @@ def main_loop(dp, flags_2_main, queue_2_main, queue_2_gui):
             if flags_2_main["flag_rescan"].is_set():
                 dp.get_midi_ports()
                 flags_2_main["flag_rescan"].clear()
+            if flags_2_main["flag_play_patt_once"].is_set():
+                dp.play_drum_pattern()
+                flags_2_main["flag_play_patt_once"].clear()
             if flags_2_main["flag_play_patt"].is_set():
                 dp.play_drum_pattern()
             if flags_2_main["flag_stop_play_patt"].is_set():
@@ -56,10 +59,15 @@ def main_loop(dp, flags_2_main, queue_2_main, queue_2_gui):
             if flags_2_main["flag_play_song"].is_set():
                 dp.play_song()
                 flags_2_main["flag_play_song"].clear()
+            if flags_2_main["flag_save_midifile"].is_set():
+                dp.create_and_save_midi_file()
+                flags_2_main["flag_save_midifile"].clear()
             if flags_2_main["flag_stop_play_song"].is_set():
                 flags_2_main["flag_play_patt"].clear()
-
                 flags_2_main["flag_stop_play_song"].clear()
+
+
+
             try:
                 message = queue_2_main.get_nowait()
                 message = message.split('\n')
@@ -83,7 +91,7 @@ def main_loop(dp, flags_2_main, queue_2_main, queue_2_gui):
                     dp.chosen_pattern = message[2]
                     dp.chosen_bpm = message[3]
                     dp.chosen_channel = message[4]
-                    dp.ticks_2_play = message[5]
+                    dp.steps_2_play = message[5]
                 if message[0] == "BPM change:":
                     dp.chosen_bpm = message[1]
                 if message[0] == "Instrument change:":
@@ -92,8 +100,9 @@ def main_loop(dp, flags_2_main, queue_2_main, queue_2_gui):
                     dp.chosen_channel = message[1]
                 if message[0] == "Song_loaded:":
                     dp.chosen_song = json.loads(message[1])
-                if message[0] == "Ticks_2_play_change:":
-                   dp.ticks_2_play = message[1]
+                if message[0] == "Steps_2_play_change:":
+                   dp.steps_2_play = message[1]
+
 
 
             except queue.Empty:
@@ -109,10 +118,12 @@ def main():
     flags_2_main = {"flag_midi_port": 0,
                     "flag_rescan" : 1,
                     "flag_play_patt" : 2,
-                    "flag_stop_play_patt" : 3,
-                    "flag_play_song" : 4,
-                    "flag_stop_play_song" : 5,
-                    "flag_exit" : 6}
+                    "flag_play_patt_once" : 3,
+                    "flag_stop_play_patt" : 4,
+                    "flag_play_song" : 5,
+                    "flag_stop_play_song" : 6,
+                    "flag_save_midifile" : 7,
+                    "flag_exit" : 8}
     for f in flags_2_main:
         flags_2_main[f] = threading.Event()
 
