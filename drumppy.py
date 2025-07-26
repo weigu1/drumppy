@@ -34,9 +34,11 @@ from time import gmtime, strftime, localtime, sleep
 import queue
 from drumppy_gui import start_gui, GUI
 from drumppy_functions import DrumppyFunctions
+from drumppy_midifile import DrumppyMidiFile
+
 import json
 
-def main_loop(dp, flags_2_main, queue_2_main, queue_2_gui):
+def main_loop(dp, mi, flags_2_main, queue_2_main, queue_2_gui):
     """Main loop for handling device communication and GUI updates"""
     dp.create_music_genres_files()  # Create music genres files if they don't exist
     try:
@@ -59,14 +61,20 @@ def main_loop(dp, flags_2_main, queue_2_main, queue_2_gui):
             if flags_2_main["flag_play_song"].is_set():
                 dp.play_song()
                 flags_2_main["flag_play_song"].clear()
-            if flags_2_main["flag_save_midifile"].is_set():
-                dp.create_and_save_midi_file()
-                flags_2_main["flag_save_midifile"].clear()
             if flags_2_main["flag_stop_play_song"].is_set():
                 flags_2_main["flag_play_patt"].clear()
                 flags_2_main["flag_stop_play_song"].clear()
-
-
+            if flags_2_main["flag_save_patt_midi"].is_set():
+                print(dp.chosen_instrument)
+                print(dp.chosen_genre)
+                print(dp.chosen_pattern)
+                mi.create_pattern_midi_file(dp.chosen_instrument,
+                                            dp.chosen_genre,
+                                            dp.chosen_pattern)
+                flags_2_main["flag_save_patt_midi"].clear()
+            if flags_2_main["flag_save_song_midi"].is_set():
+                dp.create_and_save_midi_file()
+                flags_2_main["flag_save_song_midi"].clear()
 
             try:
                 message = queue_2_main.get_nowait()
@@ -77,8 +85,9 @@ def main_loop(dp, flags_2_main, queue_2_main, queue_2_gui):
                     dp.chosen_channel = message[2]
                     flags_2_main["flag_midi_port"].set()
                 if message[0] == "Patterns:":
-                    dp.drum_patterns_module_name = message[1]
+                    dp.drum_patterns_module_name = message[1] # to reload module dyn.
                     dp.drum_patterns_names = json.loads(message[2])
+                    dp.chosen_genre = message[3]
                     dp.load_drum_patterns()
                 if message[0] == "Instruments_names:":
                     dp.instruments_names = json.loads(message[1])
@@ -122,8 +131,9 @@ def main():
                     "flag_stop_play_patt" : 4,
                     "flag_play_song" : 5,
                     "flag_stop_play_song" : 6,
-                    "flag_save_midifile" : 7,
-                    "flag_exit" : 8}
+                    "flag_save_patt_midi" : 7,
+                    "flag_save_song_midi" : 8,
+                    "flag_exit" : 9}
     for f in flags_2_main:
         flags_2_main[f] = threading.Event()
 
@@ -132,10 +142,11 @@ def main():
     queue_2_png = queue.Queue()   # Queue for communication from main_loop to PNG creation thread
 
     dp = DrumppyFunctions(flags_2_main, queue_2_main, queue_2_gui)
+    mi = DrumppyMidiFile()
 
     # Create GUI, main loop, and PNG creation threads
     gui_thread = threading.Thread(target=start_gui, args=(flags_2_main, queue_2_main, queue_2_gui))
-    main_thread = threading.Thread(target=main_loop, args=(dp, flags_2_main, queue_2_main, queue_2_gui))
+    main_thread = threading.Thread(target=main_loop, args=(dp, mi, flags_2_main, queue_2_main, queue_2_gui))
 
     gui_thread.start()
     main_thread.start()

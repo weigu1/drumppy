@@ -83,7 +83,6 @@ class DrumppyFunctions:
             print(text)
             self.queue_2_gui.put(text)
 
-
     def check_port(self, midi_port = "CH345:CH345 MIDI 1"):  # "USB MIDI 2x2:USB MIDI 2x2 MIDI 1"
         """Function to check if a specific MIDI port is available."""
         try:

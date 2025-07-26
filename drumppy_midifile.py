@@ -100,8 +100,10 @@ class DrumppyMidiFile:
         events.sort(key=lambda x: x[0]) # Sort in-place
         return events
 
-    def create_pattern_midi_file(self, instrument, pattern, filename, first_dt= 0):
+    def create_pattern_midi_file(self, instr_name, music_genre, pattern_name, first_dt= 0):
         """     dt stands for delta time in ticks """
+        instrument = self.get_instrument(instr_name)
+        pattern = self.get_pattern(music_genre, pattern_name)
         print(pattern)
         mfile = MidiFile(type=1) # Type = 1
         mfile.ticks_per_beat = self.ppqn # Set the number of ticks per quarter note
@@ -139,7 +141,9 @@ class DrumppyMidiFile:
             mtrack1.append(MetaMessage('end_of_track', time=tick_end-events[-1][0])) # length overall = 16/16 notes
         else:
             mtrack1.append(MetaMessage('end_of_track', time=0)) # length overall = 16/16 notes
+        filename = f"drumppy_patterns_mid/drumppy_pattern_{music_genre}_{pattern_name}.mid"
         mfile.save(filename)
+        return filename
 
 
     def play_midi_file(self, mport, filename):
@@ -181,15 +185,12 @@ def main():
 
     filename_3 = "drum_pattern.mid"
     #port = "Pico:Pico CircuitPython usb_midi.por"
-    instrument = "nano_synth"
+    instr_name = "nano_synth"
+
 
     mf = DrumppyMidiFile()
-    instrument = mf.get_instrument(instrument)
-    port = instrument["midi_port"]
-
-    pattern = mf.get_pattern(music_genre, pattern_name)
-    filename = "test.mid"
-    mf.create_pattern_midi_file(instrument, pattern, filename, 0)
+    port = mf.get_instrument(instr_name)["midi_port"]
+    filename = mf.create_pattern_midi_file(instr_name, music_genre, pattern_name)
     mf.play_midi_file(port, filename)
 
     #if mf.check_port(port)==port:
